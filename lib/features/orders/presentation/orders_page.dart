@@ -14,7 +14,9 @@ class OrdersPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final user = ref.watch(currentUserProvider);
+    final user = ref.watch(sessionProvider);
+    // Logged out (e.g. mid-pop after sign-out): render nothing.
+    if (user == null) return const Scaffold();
     final state = ref.watch(ordersControllerProvider);
     final controller = ref.read(ordersControllerProvider.notifier);
 
@@ -42,7 +44,10 @@ class OrdersPage extends ConsumerWidget {
           IconButton(
             tooltip: 'Sign out',
             icon: const Icon(Icons.logout),
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: () {
+              Navigator.of(context).pop();
+              ref.read(sessionProvider.notifier).logout();
+            },
           ),
         ],
       ),

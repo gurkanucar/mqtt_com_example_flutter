@@ -52,7 +52,11 @@ class MqttService {
           .startClean());
 
     _statusController.add(MqttConnectionState.connecting);
+    // ignore: avoid_print
+    print('[MQTT] connecting as $clientId ...');
     await _client.connect(username, password);
+    // ignore: avoid_print
+    print('[MQTT] connect() returned: ${_client.connectionStatus}');
 
     _client.subscribe(stateTopic, MqttQos.atLeastOnce);
     _client.updates!.listen((events) {
@@ -80,11 +84,17 @@ class MqttService {
     );
   }
 
-  void _handleConnected() =>
-      _statusController.add(MqttConnectionState.connected);
+  void _handleConnected() {
+    // ignore: avoid_print
+    print('[MQTT] onConnected');
+    _statusController.add(MqttConnectionState.connected);
+  }
 
-  void _handleDisconnected() =>
-      _statusController.add(MqttConnectionState.disconnected);
+  void _handleDisconnected() {
+    // ignore: avoid_print
+    print('[MQTT] onDisconnected');
+    _statusController.add(MqttConnectionState.disconnected);
+  }
 
   void dispose() {
     try {

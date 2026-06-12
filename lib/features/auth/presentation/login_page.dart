@@ -46,12 +46,12 @@ class LoginPage extends StatelessWidget {
   }
 }
 
-class _UserCard extends StatelessWidget {
+class _UserCard extends ConsumerWidget {
   const _UserCard({required this.user});
   final AppUser user;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     return Card(
       clipBehavior: Clip.antiAlias,
@@ -73,19 +73,13 @@ class _UserCard extends StatelessWidget {
             Text(user.id, style: const TextStyle(fontWeight: FontWeight.w600)),
         subtitle: Text(user.isMaster ? 'Master' : 'Officer'),
         trailing: const Icon(Icons.chevron_right),
-        onTap: () => _signIn(context, user),
+        onTap: () {
+          ref.read(sessionProvider.notifier).login(user);
+          Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const OrdersPage()),
+          );
+        },
       ),
     );
-  }
-
-  void _signIn(BuildContext context, AppUser user) {
-    // Open a fresh ProviderScope for this session so the orders controller and
-    // its MQTT connection are scoped to the chosen user and disposed on logout.
-    Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => ProviderScope(
-        overrides: [currentUserProvider.overrideWithValue(user)],
-        child: const OrdersPage(),
-      ),
-    ));
   }
 }

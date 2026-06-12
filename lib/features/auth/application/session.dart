@@ -2,11 +2,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../domain/app_user.dart';
 
-/// The signed-in user for a given navigation subtree.
+/// The currently signed-in user (null when on the login screen).
 ///
-/// This is overridden with `overrideWithValue(user)` in a nested
-/// [ProviderScope] when navigating to the orders screen, so every screen below
-/// it (and the orders controller) sees the user that logged in.
-final currentUserProvider = Provider<AppUser>(
-  (ref) => throw StateError('currentUserProvider must be overridden'),
-);
+/// A plain root-level provider — set on login, cleared on logout. The orders
+/// controller `watch`es this, so it (re)connects for the right user and
+/// disposes cleanly when the user logs out.
+class SessionNotifier extends Notifier<AppUser?> {
+  @override
+  AppUser? build() => const AppUser('amir', true); // TEMP: auto-login for diagnostics
+
+  void login(AppUser user) => state = user;
+  void logout() => state = null;
+}
+
+final sessionProvider =
+    NotifierProvider<SessionNotifier, AppUser?>(SessionNotifier.new);

@@ -50,32 +50,46 @@ class OrdersUiState {
 }
 
 /// Owns the MQTT connection and the shared order state for the logged-in user.
+///
+/// Rebuilt by Riverpod whenever [sessionProvider] changes (login / logout), so
+/// fields are nullable/reassignable rather than `late final`.
 class OrdersController extends Notifier<OrdersUiState> {
-  late final MqttService _mqtt;
-  late final String _userId;
-  late final bool _isMaster;
+  MqttService? _mqtt;
+  String _userId = '';
+  bool _isMaster = false;
 
   @override
   OrdersUiState build() {
-    final user = ref.watch(currentUserProvider);
+    final user = ref.watch(sessionProvider);
+    if (user == null) {
+      // Logged out: nothing to connect.
+      return OrdersUiState.initial();
+    }
     _userId = user.id;
     _isMaster = user.isMaster;
 
-    _mqtt = MqttService(userLabel: _userId);
-    _mqtt.stateStream.listen(_onRemoteState);
-    _mqtt.statusStream.listen((s) => state = state.copyWith(status: s));
-    ref.onDispose(_mqtt.dispose);
+    final mqtt = MqttService(userLabel: _userId);
+    _mqtt = mqtt;
+    mqtt.stateStream.listen(_onRemoteState);
+    mqtt.statusStream.listen((s) => state = state.copyWith(status: s));
+    // Fires on rebuild (re-login) and on provider disposal — closes the old
+    // connection so we never leak sockets.
+    ref.onDispose(mqtt.dispose);
 
-    _connect();
+    // Deferred: we must not touch `state` until build() has returned, otherwise
+    // Riverpod throws "Tried to read the state of an uninitialized provider".
+    Future.microtask(_connect);
     return OrdersUiState.initial();
   }
 
   Future<void> connect() => _connect();
 
   Future<void> _connect() async {
+    final mqtt = _mqtt;
+    if (mqtt == null) return;
     state = state.copyWith(error: null);
     try {
-      await _mqtt.connect();
+      await mqtt.connect();
     } catch (e) {
       state = state.copyWith(error: 'Could not connect: $e');
     }
@@ -102,7 +116,7 @@ class OrdersController extends Notifier<OrdersUiState> {
     if (name.isEmpty) return;
     final orders = state.orders..ensureFlight(name);
     state = state.copyWith(orders: orders, selectedFlight: name);
-    _mqtt.publishState(orders.toPayload(by: _userId, action: 'added flight $name'));
+    _mqtt?.publishState(orders.toPayload(by: _userId, action: 'added flight $name'));
   }
 
   // ---- internals ----------------------------------------------------------
@@ -113,7 +127,7 @@ class OrdersController extends Notifier<OrdersUiState> {
   /// and never logged twice.
   void _applyLocal(OrderState orders, String action) {
     state = state.copyWith(orders: orders);
-    _mqtt.publishState(orders.toPayload(by: _userId, action: action));
+    _mqtt?.publishState(orders.toPayload(by: _userId, action: action));
   }
 
   void _onRemoteState(String payload) {

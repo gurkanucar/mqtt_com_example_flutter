@@ -1,30 +1,50 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
-import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:mqtt_com_example/features/orders/domain/order_state.dart';
 import 'package:mqtt_com_example/main.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  group('OrderState', () {
+    test('starts with all default flights at zero', () {
+      final state = OrderState.initial();
+      for (final flight in kDefaultFlights) {
+        for (final product in kProducts) {
+          expect(state.count(flight, product), 0);
+        }
+      }
+    });
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    test('bump increases and clamps at zero', () {
+      final state = OrderState.initial()
+        ..bump('TK1234', 'Coffee', 2)
+        ..bump('TK1234', 'Coffee', -5);
+      expect(state.count('TK1234', 'Coffee'), 0);
+    });
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+    test('survives a publish -> parse round trip', () {
+      final original = OrderState.initial()..bump('TK1234', 'Water', 3);
+      final payload = original.toPayload(by: 'memur1', action: '+3 Water');
+      final restored = OrderState.fromJson(payload);
+      expect(restored.count('TK1234', 'Water'), 3);
+    });
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    test('parsing a payload from an unknown flight keeps it', () {
+      const payload = '{"flights":{"TK9999":{"Coffee":1}}}';
+      final restored = OrderState.fromJson(payload);
+      expect(restored.count('TK9999', 'Coffee'), 1);
+      // default flights still present
+      expect(restored.flights.containsKey('TK1234'), isTrue);
+    });
+  });
+
+  testWidgets('login page shows the three users', (tester) async {
+    await tester.pumpWidget(const ProviderScope(child: MainApp()));
+    await tester.pumpAndSettle();
+
+    expect(find.text('amir'), findsOneWidget);
+    expect(find.text('memur1'), findsOneWidget);
+    expect(find.text('memur2'), findsOneWidget);
+    expect(find.text('Master'), findsOneWidget);
   });
 }
