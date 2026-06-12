@@ -1,4 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Required for the MQTT TCP connection to the broker. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
         android:label="mqtt_com_example"
         android:name="${applicationName}"

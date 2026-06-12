@@ -1,0 +1,39 @@
+services:
+  # Eclipse Mosquitto — lightweight MQTT broker
+  #  • MQTT     → 1883  (reach from other containers as host "mqtt")
+  #  • MQTT/WS  → 9001  (MQTT over WebSockets, e.g. from a browser)
+  mqtt:
+    image: eclipse-mosquitto:2
+    container_name: mqtt
+    restart: unless-stopped
+    environment:
+      MQTT_USER: ${MQTT_USER:-app}
+      MQTT_PASSWORD: ${MQTT_PASSWORD:-changeme}
+    # Generate the password file from .env on startup, then launch the broker.
+    # ($$ escapes Compose interpolation so the shell expands the vars at runtime.)
+    # The command runs as root, but mosquitto drops to the "mosquitto" user — so
+    # chown the passwd file to that user or the broker can't read it. rm -f first
+    # so a re-run cleanly rewrites it (mosquitto_passwd -c won't clobber a leftover).
+    command: >
+      sh -c "rm -f /mosquitto/data/passwd &&
+             mosquitto_passwd -c -b /mosquitto/data/passwd \"$$MQTT_USER\" \"$$MQTT_PASSWORD\" &&
+             chown mosquitto:mosquitto /mosquitto/data/passwd &&
+             chmod 0600 /mosquitto/data/passwd &&
+             exec mosquitto -c /mosquitto/config/mosquitto.conf"
+    ports:
+      - "1883:1883"          # MQTT
+      - "9001:9001"          # MQTT over WebSockets
+    volumes:
+      - ./config/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - mqtt-data:/mosquitto/data
+      - mqtt-log:/mosquitto/log
+    healthcheck:
+      # publish a throwaway message to itself (with auth); non-zero exit = unhealthy
+      test: ["CMD-SHELL", "mosquitto_pub -h localhost -t healthcheck -m ok -u \"$$MQTT_USER\" -P \"$$MQTT_PASSWORD\" || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+
+volumes:
+  mqtt-data:
+  mqtt-log:
