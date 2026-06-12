@@ -9,7 +9,7 @@ import '../domain/app_user.dart';
 /// disposes cleanly when the user logs out.
 class SessionNotifier extends Notifier<AppUser?> {
   @override
-  AppUser? build() => const AppUser('amir', true); // TEMP: auto-login for diagnostics
+  AppUser? build() => null;
 
   void login(AppUser user) => state = user;
   void logout() => state = null;
