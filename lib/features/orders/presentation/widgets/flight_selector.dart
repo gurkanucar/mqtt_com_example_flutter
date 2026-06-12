@@ -13,7 +13,10 @@ class FlightSelector extends StatelessWidget {
   final List<String> flights;
   final String selected;
   final ValueChanged<String> onChanged;
-  final VoidCallback onAdd;
+
+  /// When null, the add-flight button is hidden (flight management is
+  /// master-only).
+  final VoidCallback? onAdd;
 
   @override
   Widget build(BuildContext context) {
@@ -40,11 +43,12 @@ class FlightSelector extends StatelessWidget {
                 },
               ),
             ),
-            IconButton.filledTonal(
-              tooltip: 'Add flight',
-              icon: const Icon(Icons.add),
-              onPressed: onAdd,
-            ),
+            if (onAdd != null)
+              IconButton.filledTonal(
+                tooltip: 'Add flight',
+                icon: const Icon(Icons.add),
+                onPressed: onAdd,
+              ),
           ],
         ),
       ),

@@ -3,41 +3,71 @@ import 'dart:async';
 import 'package:mqtt_client/mqtt_client.dart';
 import 'package:mqtt_client/mqtt_server_client.dart';
 
-/// Thin wrapper around the MQTT client used to sync flight orders between
-/// amir / memur1 / memur2.
-///
-/// Everyone subscribes to a single *retained* state topic. Whenever a device
-/// changes an order it republishes the full state (retained), so all devices —
-/// including ones that connect afterwards — stay in sync.
-class MqttService {
-  MqttService({required this.userLabel});
+/// A message received from the broker.
+class BrokerMessage {
+  const BrokerMessage(this.topic, this.payload);
+  final String topic;
+  final String payload;
+}
 
-  /// Which user this device is logged in as (amir / memur1 / memur2).
-  final String userLabel;
+/// An MQTT Last Will — published by the broker on the client's behalf if the
+/// client drops without a clean disconnect. Used so memurs learn the master
+/// went offline.
+class MqttWill {
+  const MqttWill({
+    required this.topic,
+    required this.payload,
+    this.retain = true,
+  });
+  final String topic;
+  final String payload;
+  final bool retain;
+}
+
+/// Generic MQTT transport: connect with a set of subscriptions (and optional
+/// Last Will), publish to any topic, and receive every message as a stream.
+///
+/// It carries no app semantics — the orders controller decides which topics to
+/// use for state, requests, and presence.
+class MqttService {
+  MqttService({required this.clientLabel});
+
+  /// Used to build a unique, human-readable client id (e.g. the user id).
+  final String clientLabel;
 
   static const String host = '173.249.32.141';
   static const int port = 1883;
   static const String username = 'app';
   static const String password = 'changeme';
-  static const String stateTopic = 'flightorders/state';
 
   late MqttServerClient _client;
 
-  final _stateController = StreamController<String>.broadcast();
+  final _messages = StreamController<BrokerMessage>.broadcast();
   final _statusController = StreamController<MqttConnectionState>.broadcast();
 
-  /// Emits the raw JSON payload every time the shared state changes.
-  Stream<String> get stateStream => _stateController.stream;
-
-  /// Emits connection-state changes so the UI can show a status indicator.
+  Stream<BrokerMessage> get messages => _messages.stream;
   Stream<MqttConnectionState> get statusStream => _statusController.stream;
 
   MqttConnectionState get status =>
       _client.connectionStatus?.state ?? MqttConnectionState.disconnected;
 
-  Future<void> connect() async {
+  Future<void> connect({
+    required List<String> subscriptions,
+    MqttWill? will,
+  }) async {
     final clientId =
-        'flight_${userLabel}_${DateTime.now().millisecondsSinceEpoch}';
+        'flight_${clientLabel}_${DateTime.now().millisecondsSinceEpoch}';
+
+    final connectMessage = MqttConnectMessage()
+        .withClientIdentifier(clientId)
+        .startClean();
+    if (will != null) {
+      connectMessage
+          .withWillTopic(will.topic)
+          .withWillMessage(will.payload)
+          .withWillQos(MqttQos.atLeastOnce);
+      if (will.retain) connectMessage.withWillRetain();
+    }
 
     _client = MqttServerClient.withPort(host, clientId, port)
       ..keepAlivePeriod = 30
@@ -47,36 +77,33 @@ class MqttService {
       ..onConnected = _handleConnected
       ..onDisconnected = _handleDisconnected
       ..onAutoReconnected = _handleConnected
-      ..connectionMessage = (MqttConnectMessage()
-          .withClientIdentifier(clientId)
-          .startClean());
+      ..connectionMessage = connectMessage;
 
     _statusController.add(MqttConnectionState.connecting);
     await _client.connect(username, password);
 
-    _client.subscribe(stateTopic, MqttQos.atLeastOnce);
+    for (final topic in subscriptions) {
+      _client.subscribe(topic, MqttQos.atLeastOnce);
+    }
     _client.updates!.listen((events) {
       for (final event in events) {
         final message = event.payload as MqttPublishMessage;
         final payload = MqttPublishPayload.bytesToStringAsString(
           message.payload.message,
         );
-        if (event.topic == stateTopic && payload.isNotEmpty) {
-          _stateController.add(payload);
-        }
+        _messages.add(BrokerMessage(event.topic, payload));
       }
     });
   }
 
-  /// Publishes the full state, retained, so it survives for late joiners.
-  void publishState(String json) {
+  void publish(String topic, String payload, {bool retain = false}) {
     if (status != MqttConnectionState.connected) return;
-    final builder = MqttClientPayloadBuilder()..addString(json);
+    final builder = MqttClientPayloadBuilder()..addString(payload);
     _client.publishMessage(
-      stateTopic,
+      topic,
       MqttQos.atLeastOnce,
       builder.payload!,
-      retain: true,
+      retain: retain,
     );
   }
 
@@ -90,7 +117,7 @@ class MqttService {
     try {
       _client.disconnect();
     } catch (_) {}
-    _stateController.close();
+    _messages.close();
     _statusController.close();
   }
 }

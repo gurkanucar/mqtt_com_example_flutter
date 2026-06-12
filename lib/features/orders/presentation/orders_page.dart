@@ -55,11 +55,14 @@ class OrdersPage extends ConsumerWidget {
         children: [
           if (state.error != null)
             _ErrorBanner(message: state.error!, onRetry: controller.connect),
+          if (!user.isMaster && state.masterOnline == false)
+            const _MasterOfflineBanner(),
           FlightSelector(
             flights: flights,
             selected: selected,
             onChanged: controller.selectFlight,
-            onAdd: () => _addFlight(context, controller),
+            // Flight management is master-only.
+            onAdd: user.isMaster ? () => _addFlight(context, controller) : null,
           ),
           Expanded(
             child: ListView(
@@ -135,6 +138,34 @@ class OrdersPage extends ConsumerWidget {
       ),
     );
     if (flight != null) controller.addFlight(flight);
+  }
+}
+
+class _MasterOfflineBanner extends StatelessWidget {
+  const _MasterOfflineBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Material(
+      color: theme.colorScheme.tertiaryContainer,
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          children: [
+            Icon(Icons.cloud_off, color: theme.colorScheme.onTertiaryContainer),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Master (amir) is offline — your orders won\'t be saved until '
+                'amir is back.',
+                style: TextStyle(color: theme.colorScheme.onTertiaryContainer),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
