@@ -29,14 +29,58 @@ class MqttWill {
 ///
 /// It carries no app semantics — the orders controller decides which topics to
 /// use for state, requests, and presence.
+/// Which broker endpoint to dial.
+enum MqttConnectionMode { ssl, ip }
+
+/// A broker endpoint: where to connect and whether to wrap it in TLS.
+///
+/// Two presets matching the staging server:
+/// - [ssl]: `stagingenvironment.space:8883` — nginx terminates TLS and forwards
+///   to the broker. Encrypted, cert-validated against the system trust store.
+/// - [ip]: `173.249.32.141:1883` — straight to mosquitto, no encryption.
+class MqttEndpoint {
+  const MqttEndpoint({
+    required this.mode,
+    required this.host,
+    required this.port,
+    required this.secure,
+  });
+
+  final MqttConnectionMode mode;
+  final String host;
+  final int port;
+  final bool secure;
+
+  static const ssl = MqttEndpoint(
+    mode: MqttConnectionMode.ssl,
+    host: 'stagingenvironment.space',
+    port: 8883,
+    secure: true,
+  );
+
+  static const ip = MqttEndpoint(
+    mode: MqttConnectionMode.ip,
+    host: '173.249.32.141',
+    port: 1883,
+    secure: false,
+  );
+
+  static MqttEndpoint of(MqttConnectionMode mode) =>
+      mode == MqttConnectionMode.ssl ? ssl : ip;
+
+  String get title => mode == MqttConnectionMode.ssl ? 'SSL' : 'Plain IP';
+  String get summary => '$host:$port${secure ? '  ·  TLS' : ''}';
+}
+
 class MqttService {
-  MqttService({required this.clientLabel});
+  MqttService({required this.clientLabel, this.endpoint = MqttEndpoint.ssl});
 
   /// Used to build a unique, human-readable client id (e.g. the user id).
   final String clientLabel;
 
-  static const String host = '173.249.32.141';
-  static const int port = 1883;
+  /// Where to connect and whether to use TLS.
+  final MqttEndpoint endpoint;
+
   static const String username = 'app';
   static const String password = 'changeme';
 
@@ -69,7 +113,10 @@ class MqttService {
       if (will.retain) connectMessage.withWillRetain();
     }
 
-    _client = MqttServerClient.withPort(host, clientId, port)
+    _client = MqttServerClient.withPort(endpoint.host, clientId, endpoint.port)
+      // TLS for the SSL endpoint; the default SecurityContext validates the
+      // Let's Encrypt cert against the platform trust store.
+      ..secure = endpoint.secure
       ..keepAlivePeriod = 30
       ..autoReconnect = true
       ..resubscribeOnAutoReconnect = true

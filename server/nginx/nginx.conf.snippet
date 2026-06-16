@@ -1,0 +1,7 @@
+# This block was appended to the TOP LEVEL of /etc/nginx/nginx.conf
+# (a `stream {}` block CANNOT live inside the `http {}` block).
+# It pulls in mqtt-stream.conf, which TLS-terminates MQTT on 8883.
+
+stream {
+    include /etc/nginx/stream.d/*.conf;
+}

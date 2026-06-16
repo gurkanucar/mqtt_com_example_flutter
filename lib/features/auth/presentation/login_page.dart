@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/mqtt/mqtt_mode_provider.dart';
+import '../../../core/mqtt/mqtt_service.dart';
 import '../../orders/presentation/orders_page.dart';
 import '../application/session.dart';
 import '../domain/app_user.dart';
@@ -33,6 +35,8 @@ class LoginPage extends StatelessWidget {
                     style: theme.textTheme.bodyMedium
                         ?.copyWith(color: theme.colorScheme.outline)),
                 const SizedBox(height: 32),
+                const _ConnectionModeSelector(),
+                const SizedBox(height: 24),
                 for (final user in kUsers) ...[
                   _UserCard(user: user),
                   const SizedBox(height: 12),
@@ -42,6 +46,51 @@ class LoginPage extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Lets the user choose how to reach the broker before signing in:
+/// SSL via the subdomain, or a plain connection to the raw IP.
+class _ConnectionModeSelector extends ConsumerWidget {
+  const _ConnectionModeSelector();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final mode = ref.watch(mqttModeProvider);
+    final endpoint = MqttEndpoint.of(mode);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text('Connection', style: theme.textTheme.labelLarge),
+        const SizedBox(height: 8),
+        SegmentedButton<MqttConnectionMode>(
+          segments: const [
+            ButtonSegment(
+              value: MqttConnectionMode.ssl,
+              label: Text('SSL'),
+              icon: Icon(Icons.lock_outline),
+            ),
+            ButtonSegment(
+              value: MqttConnectionMode.ip,
+              label: Text('IP'),
+              icon: Icon(Icons.lan_outlined),
+            ),
+          ],
+          selected: {mode},
+          onSelectionChanged: (selection) =>
+              ref.read(mqttModeProvider.notifier).set(selection.first),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          endpoint.summary,
+          textAlign: TextAlign.center,
+          style: theme.textTheme.bodySmall
+              ?.copyWith(color: theme.colorScheme.outline),
+        ),
+      ],
     );
   }
 }

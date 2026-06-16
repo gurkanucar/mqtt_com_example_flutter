@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mqtt_client/mqtt_client.dart';
 
+import '../../../core/mqtt/mqtt_mode_provider.dart';
 import '../../../core/mqtt/mqtt_service.dart';
 import '../../auth/application/session.dart';
 import '../domain/order_state.dart';
@@ -86,11 +87,15 @@ class OrdersController extends Notifier<OrdersUiState> {
     final user = ref.watch(sessionProvider);
     if (user == null) return OrdersUiState.initial();
 
+    // Re-runs build() (and thus reconnects) whenever the user flips SSL ⇄ IP.
+    final mode = ref.watch(mqttModeProvider);
+
     _userId = user.id;
     _isMaster = user.isMaster;
     _bootstrapped = false;
 
-    final mqtt = MqttService(clientLabel: _userId);
+    final mqtt =
+        MqttService(clientLabel: _userId, endpoint: MqttEndpoint.of(mode));
     _mqtt = mqtt;
     mqtt.messages.listen(_onMessage);
     mqtt.statusStream.listen((s) => state = state.copyWith(status: s));
