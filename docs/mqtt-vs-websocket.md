@@ -10,15 +10,18 @@ Mimarinin ayrıntısı (topic'ler, payload'lar, master modeli) için bkz.
 
 ---
 
-## 1. Tek cümlede fark
+## 1. Temel fark
 
-> WebSocket sadece bir **taşıma kanalıdır** — kalıcı bir veri borusu.
-> MQTT bunun üstüne **broker, pub/sub, son-durum saklama (retained), çevrimdışı
-> tespiti (Last Will) ve teslim garantisi (QoS)** ekleyen tam bir
-> **mesajlaşma protokolüdür.**
+WebSocket, TCP üzerinde çift yönlü ve kalıcı bir bağlantı sağlayan bir **taşıma
+katmanı protokolüdür** (OSI L7'de oturur ama uygulama semantiği taşımaz). Bayt/
+mesaj çerçevelerini iletir; bunların *anlamını*, *kime gideceğini* ve *durumun
+nasıl saklanacağını* tanımlamaz.
 
-WebSocket ile bunların hepsini **kendimiz yazmak** zorunda kalırdık — ve dağıtık
-ortamda yanlış yazmak çok kolay.
+MQTT ise bu taşıma üstüne **broker tabanlı publish/subscribe**, **son-durum
+saklama (retained)**, **çevrimdışı tespiti (Last Will & Testament)** ve **teslim
+garantisi (QoS 0/1/2)** ekleyen tam bir **mesajlaşma protokolüdür**. WebSocket ile
+çalışsaydık bu yeteneklerin hepsini uygulama/sunucu katmanında **kendimiz
+gerçeklemek** zorunda kalırdık — ve dağıtık ortamda doğru kurmak zordur.
 
 ---
 
