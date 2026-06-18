@@ -77,7 +77,7 @@ WebSocket "gönder ve unut"tur; mesajın ulaşıp ulaşmadığını garanti etme
 
 ## 3. WebSocket vs MQTT — karşılaştırma
 
-| Konu | WebSocket (çıplak) | MQTT |
+| Konu | WebSocket | MQTT |
 |------|--------------------|------|
 | Katman | Sadece taşıma | Tam mesajlaşma protokolü |
 | Multi-instance fan-out | ❌ Manuel backplane (Redis/NATS) gerekir | ✅ Broker doğal merkez |
@@ -85,15 +85,25 @@ WebSocket "gönder ve unut"tur; mesajın ulaşıp ulaşmadığını garanti etme
 | Çevrimdışı tespiti | ❌ Elle heartbeat/timeout | ✅ Last Will |
 | Teslim garantisi | ❌ Yok | ✅ QoS |
 | Yönlendirme | Sunucu kodu yazar | ✅ Topic + abonelik |
+| Batarya / güç tüketimi | Daha yüksek (büyük çerçeve, elle ping) | ✅ Düşük (2 baytlık başlık, PINGREQ) |
 
 > Not: MQTT, tarayıcıda **WebSocket üzerinden** de çalışabilir (projedeki
 > `wss://stagingenvironment.space/mqtt` yolu gibi). Yani seçim aslında
-> "WebSocket mı MQTT mi" değil; **"çıplak WebSocket üstüne her şeyi kendim mi
-> yazayım, yoksa MQTT'nin hazır broker'ını mı kullanayım"** sorusudur.
+> "WebSocket mı MQTT mi" değil; **"WebSocket üstüne her şeyi kendim mi yazayım,
+> yoksa MQTT'nin hazır broker'ını mı kullanayım"** sorusudur.
 
 ---
 
-## 4. Sync nasıl çalışıyor? (MQTT)
+## 4. Batarya ve güç tüketimi
+
+MQTT, en baştan **düşük bant genişliği ve düşük güç** (IoT/mobil) hedefiyle
+tasarlanmıştır; sürekli bağlı kalan mobil bir istemcide pil ömrü açısından
+WebSocket'ten daha verimlidir.
+
+- **Küçük header:** MQTT'nin sabit header'ı daha küçük, daha az batarya kullanımı.
+---
+
+## 5. Sync nasıl çalışıyor? (MQTT)
 
 `architecture.md`'deki **tek yazıcı** modelini izliyoruz: amir master'dır ve tek
 gerçek kaynaktır. Memurlar veriyi **değiştirmez**, sadece *istek* gönderir; amir
@@ -127,7 +137,7 @@ of truth). amir çevrimdışıysa istek teslim edilmez, sayaç sabit kalır ve m
 
 ---
 
-## 5. Sonuç
+## 6. Sonuç
 
 - **WebSocket** iyi bir taşıma katmanıdır ama *sadece* taşımadır.
 - amir/memur senaryosunda gereken **fan-out, son-durum (retained), çevrimdışı
@@ -135,5 +145,7 @@ of truth). amir çevrimdışıysa istek teslim edilmez, sayaç sabit kalır ve m
   hepsi elle ve dağıtık ortamda kırılgan biçimde yazılır.
 - Özellikle **multi-instance** ölçeklenmede WebSocket ek backplane zorunlu
   kılarken, MQTT'de **broker doğal merkezdir.**
+- Sürekli bağlı kalan mobil istemcide MQTT, küçük header'ı ve hazır keep-alive'ı
+  sayesinde **batarya/güç tüketimi** açısından da daha avantajlıdır.
 
 Bu yüzden bu projede taşıma olarak **MQTT** seçilmiştir.
